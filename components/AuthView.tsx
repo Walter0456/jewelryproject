@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { User as UserIcon, Lock, ArrowRight, Sparkles, ShieldCheck, CheckCircle2, AlertCircle, Briefcase, Eye, EyeOff, QrCode, X, Camera, Key } from 'lucide-react';
+import { User as UserIcon, Lock, ArrowRight, Sparkles, ShieldCheck, CheckCircle2, AlertCircle, Briefcase, Eye, EyeOff, QrCode, X, Camera, Key, Link2 } from 'lucide-react';
 import { db } from '../db';
 import { User } from '../types';
 import jsQR from 'jsqr';
@@ -129,7 +129,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
           if (connected) {
             setError('Invalid credentials');
           } else {
-            setError('Backend offline or API URL is incorrect. Configure API endpoint below.');
+            setError('Backend offline or API URL is incorrect. Configure API endpoint from the API button.');
             setShowApiSettings(true);
           }
         }
@@ -223,6 +223,14 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 relative p-4 text-sm">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 rounded-full blur-[100px]"></div>
+      <button
+        type="button"
+        onClick={() => setShowApiSettings(true)}
+        className="absolute top-4 right-4 z-30 w-11 h-11 rounded-full bg-white/10 border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all shadow-lg"
+        title="Configure Backend API"
+      >
+        <Link2 size={16} />
+      </button>
       
       {isScanning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
@@ -265,6 +273,64 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
         </div>
       )}
 
+      {showApiSettings && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setShowApiSettings(false)}
+        >
+          <div
+            className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
+                  <Link2 size={14} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-white uppercase tracking-widest">Backend API Endpoint</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Active: {activeApiBase}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiSettings(false)}
+                className="w-8 h-8 rounded-full bg-white/10 text-slate-300 hover:bg-white/20 flex items-center justify-center transition-all"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <input
+                className="w-full bg-slate-950/50 border border-white/10 rounded-xl py-3 px-3 text-white text-[10px] font-bold outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-700"
+                value={apiBaseInput}
+                onChange={e => setApiBaseInput(e.target.value)}
+                placeholder="https://your-ngrok-url.ngrok-free.app"
+              />
+              {apiBaseMessage && <p className="text-[8px] font-black uppercase tracking-widest text-emerald-400">{apiBaseMessage}</p>}
+              {apiBaseError && <p className="text-[8px] font-black uppercase tracking-widest text-rose-400">{apiBaseError}</p>}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplyApiBase}
+                  className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                >
+                  Save Endpoint
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetApiBase}
+                  className="py-2.5 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/10 transition-all"
+                >
+                  Reset Default
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-600/30 mb-4 ring-4 ring-white/5">
@@ -278,51 +344,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
           <div className="flex bg-slate-950/40 p-1.5 rounded-2xl border border-white/5 mb-8">
             <button onClick={() => { setIsLogin(true); setIsCodeVerified(false); setRegistryCode(''); setError(''); }} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isLogin ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-500 hover:text-white'}`}>Login</button>
             <button onClick={handleShowRegister} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!isLogin ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-500 hover:text-white'}`}>Register</button>
-          </div>
-
-          <div className="mb-6 p-4 bg-slate-950/30 border border-white/10 rounded-2xl">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Backend API Endpoint</p>
-                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1">Active: {activeApiBase}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowApiSettings(prev => !prev)}
-                className="px-3 py-1.5 bg-white/10 border border-white/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-slate-200 hover:bg-white/20 transition-all"
-              >
-                {showApiSettings ? 'Hide' : 'Configure API'}
-              </button>
-            </div>
-
-            {showApiSettings && (
-              <div className="mt-3 space-y-3">
-                <input
-                  className="w-full bg-slate-950/40 border border-white/10 rounded-xl py-2.5 px-3 text-white text-[10px] font-bold outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-700"
-                  value={apiBaseInput}
-                  onChange={e => setApiBaseInput(e.target.value)}
-                  placeholder="https://your-ngrok-url.ngrok-free.app"
-                />
-                {apiBaseMessage && <p className="text-[8px] font-black uppercase tracking-widest text-emerald-400">{apiBaseMessage}</p>}
-                {apiBaseError && <p className="text-[8px] font-black uppercase tracking-widest text-rose-400">{apiBaseError}</p>}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleApplyApiBase}
-                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
-                  >
-                    Save Endpoint
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetApiBase}
-                    className="flex-1 py-2 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/10 transition-all"
-                  >
-                    Reset Default
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
