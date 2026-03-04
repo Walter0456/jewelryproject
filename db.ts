@@ -1,8 +1,8 @@
 
 import { Product, Activity, RevenueData, User, CartItem, Sale, SystemSettings, ReceiptLayoutSettings, ReceiptType } from './types';
 
-// Use relative paths to allow Vite proxy to handle the requests
-const API_BASE = '/api';
+// Temporary tunnel endpoint (replace whenever ngrok URL changes)
+const API_BASE = 'https://hemicyclic-stirlessly-lexi.ngrok-free.dev/api';
 
 const DB_KEYS = {
   SESSION: 'jewel_admin_session'
@@ -51,16 +51,26 @@ const clearSession = () => {
 
 const fetchJson = async (url: string, options?: RequestInit) => {
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(url, { credentials: 'include', ...options });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (response.status === 401 || response.status === 403) {
         clearSession();
       }
+      if (response.status === 502 || response.status === 503 || response.status === 504) {
+        alert("SYSTEM OFFLINE: Please turn on the backend and database on Walter's laptop.");
+      }
       throw new Error(data.message || `API Error: ${response.status}`);
     }
     return await response.json();
   } catch (err: any) {
+    if (
+      err?.name === 'TypeError' ||
+      String(err?.message || '').includes('Failed to fetch') ||
+      String(err?.message || '').includes('NetworkError')
+    ) {
+      alert("SYSTEM OFFLINE: Please turn on the backend and database on Walter's laptop.");
+    }
     console.error(`Network or API Error at ${url}:`, err);
     throw err;
   }
@@ -275,6 +285,7 @@ export const db = {
     const formData = new FormData();
     formData.append('image', file);
     const response = await fetch(`${API_BASE}/upload`, {
+      credentials: 'include',
       method: 'POST',
       body: formData,
     });

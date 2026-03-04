@@ -43,6 +43,7 @@ const TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30m';
 const PG_DUMP_PATH = process.env.PG_DUMP_PATH || 'pg_dump';
 const DEFAULT_BACKUP_DIR = process.env.BACKUP_DIR || path.join(process.cwd(), 'backups');
 const BACKUP_TASK_NAME = process.env.BACKUP_TASK_NAME || 'JewelAdmin Backup';
+const CROSS_SITE_COOKIES = String(process.env.CROSS_SITE_COOKIES || '').toLowerCase() === 'true';
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
   .split(',')
   .map((origin) => origin.trim())
@@ -572,8 +573,8 @@ app.get('/api/health', (req, res) => {
 const setAuthCookie = (res, token) => {
   res.cookie('jwt', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: CROSS_SITE_COOKIES ? true : process.env.NODE_ENV === 'production',
+    sameSite: CROSS_SITE_COOKIES ? 'none' : 'strict',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   });
 };
@@ -647,7 +648,11 @@ app.post('/api/login/qr', loginLimiter, async (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-  res.clearCookie('jwt');
+  res.clearCookie('jwt', {
+    httpOnly: true,
+    secure: CROSS_SITE_COOKIES ? true : process.env.NODE_ENV === 'production',
+    sameSite: CROSS_SITE_COOKIES ? 'none' : 'strict',
+  });
   res.json({ success: true });
 });
 
