@@ -12,6 +12,29 @@ const normalizeApiBase = (raw: string) => {
   return value.endsWith('/api') ? value : `${value}/api`;
 };
 
+const isNgrokHost = (rawUrl: string) => {
+  try {
+    const parsed = new URL(rawUrl, 'http://localhost');
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host.endsWith('.ngrok-free.dev') ||
+      host.endsWith('.ngrok.io') ||
+      host.endsWith('.ngrok.app') ||
+      host.endsWith('.ngrok-free.app')
+    );
+  } catch {
+    return false;
+  }
+};
+
+const withNgrokBypassHeader = (url: string, options: RequestInit = {}): RequestInit => {
+  const headers = new Headers(options.headers || {});
+  if (isNgrokHost(url)) {
+    headers.set('ngrok-skip-browser-warning', '1');
+  }
+  return { ...options, headers };
+};
+
 const isLocalRuntime = () => {
   if (typeof window === 'undefined') return false;
   const host = window.location.hostname;
@@ -105,7 +128,8 @@ const clearSession = () => {
 
 const fetchJson = async (url: string, options?: RequestInit) => {
   try {
-    const response = await fetch(url, { credentials: 'include', ...options });
+    const requestOptions = withNgrokBypassHeader(url, options);
+    const response = await fetch(url, { ...requestOptions, credentials: 'include' });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (response.status === 401 || response.status === 403) {
@@ -141,6 +165,11 @@ const normalizeUser = (raw: any): User => ({
 
 export const db = {
   getApiBase: (): string => API_BASE,
+
+  getApiRequestOptions: (url: string, options: RequestInit = {}): RequestInit => {
+    const requestOptions = withNgrokBypassHeader(url, options);
+    return { ...requestOptions, credentials: 'include' };
+  },
 
   getApiBaseOverride: (): string | null => {
     if (typeof window === 'undefined') return null;
@@ -367,11 +396,14 @@ export const db = {
   uploadImage: async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('image', file);
-    const response = await fetch(`${API_BASE}/upload`, {
-      credentials: 'include',
-      method: 'POST',
-      body: formData,
-    });
+    const uploadUrl = `${API_BASE}/upload`;
+    const response = await fetch(
+      uploadUrl,
+      db.getApiRequestOptions(uploadUrl, {
+        method: 'POST',
+        body: formData,
+      })
+    );
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       throw new Error(data.message || `Upload failed: ${response.status}`);

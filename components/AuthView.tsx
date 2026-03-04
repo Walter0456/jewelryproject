@@ -151,12 +151,15 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
 
   const verifyCode = async () => {
     try {
-      const response = await fetch(`${db.getApiBase()}/codes/verify`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: registryCode.toUpperCase() })
-      });
+      const verifyUrl = `${db.getApiBase()}/codes/verify`;
+      const response = await fetch(
+        verifyUrl,
+        db.getApiRequestOptions(verifyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: registryCode.toUpperCase() })
+        })
+      );
       if (response.ok) {
         setIsCodeVerified(true);
         setError('');
@@ -183,7 +186,8 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
   const checkConnection = async (baseOverride?: string) => {
     const base = baseOverride || db.getApiBase();
     try {
-      const response = await fetch(`${base}/health`, { credentials: 'include' });
+      const healthUrl = `${base}/health`;
+      const response = await fetch(healthUrl, db.getApiRequestOptions(healthUrl));
       if (!response.ok) throw new Error('Health check failed');
       setApiBaseError('');
       setApiBaseMessage('Backend connection is active.');
