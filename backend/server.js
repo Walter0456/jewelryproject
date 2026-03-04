@@ -44,6 +44,7 @@ const DEFAULT_BACKUP_DIR = process.env.BACKUP_DIR || path.join(process.cwd(), 'b
 const BACKUP_TASK_NAME = process.env.BACKUP_TASK_NAME || 'JewelAdmin Backup';
 const CROSS_SITE_COOKIES = String(process.env.CROSS_SITE_COOKIES || '').toLowerCase() === 'true';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const ALLOWED_CORS_HEADERS = 'Content-Type, Authorization, Ngrok-Skip-Browser-Warning';
 const DEFAULT_CORS_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 const CORS_ORIGINS = [
   ...new Set(
@@ -267,7 +268,7 @@ app.use((req, res, next) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', ALLOWED_CORS_HEADERS);
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     if (req.method === 'OPTIONS') {
       return res.sendStatus(204);
@@ -285,7 +286,7 @@ app.use((req, res, next) => {
   }
 
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', ALLOWED_CORS_HEADERS);
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
