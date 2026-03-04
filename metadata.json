@@ -1,0 +1,7 @@
+{
+  "name": "JewelAdmin Pro",
+  "description": "A high-performance jewelry store admin dashboard featuring real-time inventory tracking, sales analytics, and activity monitoring.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
