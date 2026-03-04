@@ -20,6 +20,11 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [showApiSettings, setShowApiSettings] = useState(false);
+  const [activeApiBase, setActiveApiBase] = useState(() => db.getApiBase());
+  const [apiBaseInput, setApiBaseInput] = useState(() => db.getApiBaseOverride() || db.getApiBase());
+  const [apiBaseMessage, setApiBaseMessage] = useState('');
+  const [apiBaseError, setApiBaseError] = useState('');
   
   // Registration code states
   const [registryCode, setRegistryCode] = useState('');
@@ -117,7 +122,17 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
     try {
       if (isLogin) {
         const user = await db.login(username, password);
-        if (user) onLoginSuccess(user); else setError('Invalid credentials');
+        if (user) {
+          onLoginSuccess(user);
+        } else {
+          const connected = await checkConnection();
+          if (connected) {
+            setError('Invalid credentials');
+          } else {
+            setError('Backend offline or API URL is incorrect. Configure API endpoint below.');
+            setShowApiSettings(true);
+          }
+        }
       } else {
         const result = await db.register(username, password, 'staff', firstName, lastName, registryCode);
         if (result.success) {
@@ -127,14 +142,18 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
           setError('Staff account created!');
         } else setError(result.message);
       }
-    } catch (err) { setError('System error'); }
+    } catch (err) {
+      setError('System error');
+      setShowApiSettings(true);
+    }
     setIsLoading(false);
   };
 
   const verifyCode = async () => {
     try {
-      const response = await fetch('/api/codes/verify', {
+      const response = await fetch(`${db.getApiBase()}/codes/verify`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: registryCode.toUpperCase() })
       });
@@ -147,7 +166,9 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
         setIsCodeVerified(false);
       }
     } catch (err) {
-      setError('Failed to verify code');
+      setError('Failed to verify code. Check API endpoint and backend connection.');
+      setShowApiSettings(true);
+      await checkConnection();
       setIsCodeVerified(false);
     }
   };
@@ -157,6 +178,46 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
     setIsCodeVerified(false);
     setRegistryCode('');
     setError('');
+  };
+
+  const checkConnection = async (baseOverride?: string) => {
+    const base = baseOverride || db.getApiBase();
+    try {
+      const response = await fetch(`${base}/health`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Health check failed');
+      setApiBaseError('');
+      setApiBaseMessage('Backend connection is active.');
+      return true;
+    } catch {
+      setApiBaseMessage('');
+      setApiBaseError('Cannot reach backend. Check API URL and ngrok status.');
+      return false;
+    }
+  };
+
+  const handleApplyApiBase = async () => {
+    setApiBaseMessage('');
+    setApiBaseError('');
+    try {
+      const next = db.setApiBaseOverride(apiBaseInput);
+      setActiveApiBase(next);
+      setApiBaseInput(next);
+      setError('');
+      await checkConnection(next);
+    } catch (err: any) {
+      setApiBaseMessage('');
+      setApiBaseError(err?.message || 'Invalid API URL');
+    }
+  };
+
+  const handleResetApiBase = async () => {
+    setApiBaseMessage('');
+    setApiBaseError('');
+    const fallback = db.clearApiBaseOverride();
+    setActiveApiBase(fallback);
+    setApiBaseInput(fallback);
+    setError('');
+    await checkConnection(fallback);
   };
 
   return (
@@ -217,6 +278,51 @@ const AuthView: React.FC<AuthViewProps> = ({ onLoginSuccess }) => {
           <div className="flex bg-slate-950/40 p-1.5 rounded-2xl border border-white/5 mb-8">
             <button onClick={() => { setIsLogin(true); setIsCodeVerified(false); setRegistryCode(''); setError(''); }} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isLogin ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-500 hover:text-white'}`}>Login</button>
             <button onClick={handleShowRegister} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!isLogin ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-500 hover:text-white'}`}>Register</button>
+          </div>
+
+          <div className="mb-6 p-4 bg-slate-950/30 border border-white/10 rounded-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Backend API Endpoint</p>
+                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1">Active: {activeApiBase}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiSettings(prev => !prev)}
+                className="px-3 py-1.5 bg-white/10 border border-white/10 rounded-lg text-[8px] font-black uppercase tracking-widest text-slate-200 hover:bg-white/20 transition-all"
+              >
+                {showApiSettings ? 'Hide' : 'Configure API'}
+              </button>
+            </div>
+
+            {showApiSettings && (
+              <div className="mt-3 space-y-3">
+                <input
+                  className="w-full bg-slate-950/40 border border-white/10 rounded-xl py-2.5 px-3 text-white text-[10px] font-bold outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-700"
+                  value={apiBaseInput}
+                  onChange={e => setApiBaseInput(e.target.value)}
+                  placeholder="https://your-ngrok-url.ngrok-free.app"
+                />
+                {apiBaseMessage && <p className="text-[8px] font-black uppercase tracking-widest text-emerald-400">{apiBaseMessage}</p>}
+                {apiBaseError && <p className="text-[8px] font-black uppercase tracking-widest text-rose-400">{apiBaseError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleApplyApiBase}
+                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                  >
+                    Save Endpoint
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetApiBase}
+                    className="flex-1 py-2 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/10 transition-all"
+                  >
+                    Reset Default
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
