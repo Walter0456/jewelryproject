@@ -3,7 +3,8 @@ import { Product, Activity, RevenueData, User, CartItem, Sale, SystemSettings, R
 
 const DB_KEYS = {
   SESSION: 'jewel_admin_session',
-  API_BASE_OVERRIDE: 'jewel_admin_api_base_override'
+  API_BASE_OVERRIDE: 'jewel_admin_api_base_override',
+  AUTH_TOKEN: 'jewel_admin_auth_token'
 };
 
 const normalizeApiBase = (raw: string) => {
@@ -39,6 +40,21 @@ const isLocalRuntime = () => {
   if (typeof window === 'undefined') return false;
   const host = window.location.hostname;
   return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+};
+
+const getStoredAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const token = (localStorage.getItem(DB_KEYS.AUTH_TOKEN) || '').trim();
+  return token || null;
+};
+
+const saveAuthToken = (token: unknown) => {
+  if (typeof window === 'undefined') return;
+  if (typeof token === 'string' && token.trim().length > 0) {
+    localStorage.setItem(DB_KEYS.AUTH_TOKEN, token.trim());
+    return;
+  }
+  localStorage.removeItem(DB_KEYS.AUTH_TOKEN);
 };
 
 let lastOfflineAlertAt = 0;
@@ -124,12 +140,18 @@ const saveSession = (user: User, loginAt?: string) => {
 
 const clearSession = () => {
   localStorage.removeItem(DB_KEYS.SESSION);
+  localStorage.removeItem(DB_KEYS.AUTH_TOKEN);
 };
 
 const fetchJson = async (url: string, options?: RequestInit) => {
   try {
     const requestOptions = withNgrokBypassHeader(url, options);
-    const response = await fetch(url, { ...requestOptions, credentials: 'include' });
+    const headers = new Headers(requestOptions.headers || {});
+    const token = getStoredAuthToken();
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    const response = await fetch(url, { ...requestOptions, headers, credentials: 'include' });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (response.status === 401 || response.status === 403) {
@@ -168,7 +190,12 @@ export const db = {
 
   getApiRequestOptions: (url: string, options: RequestInit = {}): RequestInit => {
     const requestOptions = withNgrokBypassHeader(url, options);
-    return { ...requestOptions, credentials: 'include' };
+    const headers = new Headers(requestOptions.headers || {});
+    const token = getStoredAuthToken();
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    return { ...requestOptions, headers, credentials: 'include' };
   },
 
   getApiBaseOverride: (): string | null => {
@@ -332,6 +359,7 @@ export const db = {
 
       const userPayload = extractUser(rawUser);
       const user = normalizeUser(userPayload);
+      saveAuthToken(rawUser?.token);
       saveSession(user);
       db.addLog(username, 'Login', 'Session Started');
       return user;
@@ -351,6 +379,7 @@ export const db = {
 
       const userPayload = extractUser(rawUser);
       const user = normalizeUser(userPayload);
+      saveAuthToken(rawUser?.token);
       saveSession(user);
       db.addLog(user.username, 'QR Login', 'Authenticated via Badge');
       return user;

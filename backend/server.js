@@ -443,8 +443,16 @@ const getSessionExpiry = async () => {
   return TOKEN_EXPIRES_IN;
 };
 
+const getBearerToken = (authorizationHeader) => {
+  if (!authorizationHeader || typeof authorizationHeader !== 'string') return null;
+  const [scheme, value] = authorizationHeader.trim().split(/\s+/, 2);
+  if (!scheme || !value) return null;
+  if (scheme.toLowerCase() !== 'bearer') return null;
+  return value;
+};
+
 const authenticate = async (req, res, next) => {
-  const token = req.cookies?.jwt;
+  const token = req.cookies?.jwt || getBearerToken(req.headers?.authorization);
   if (!token) {
     return res.status(401).json({ message: 'Missing auth token' });
   }
@@ -641,7 +649,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       const expiresIn = await getSessionExpiry();
       const token = signToken(safeUser.username, expiresIn);
       setAuthCookie(res, token);
-      res.json({ user: safeUser });
+      res.json({ user: safeUser, token });
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -688,7 +696,7 @@ app.post('/api/login/qr', loginLimiter, async (req, res) => {
     const expiresIn = await getSessionExpiry();
     const authToken = signToken(safeUser.username, expiresIn);
     setAuthCookie(res, authToken);
-    res.json({ user: safeUser });
+    res.json({ user: safeUser, token: authToken });
   } catch (err) {
     handleError(res, err);
   }
