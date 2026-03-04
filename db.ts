@@ -1,12 +1,46 @@
 
 import { Product, Activity, RevenueData, User, CartItem, Sale, SystemSettings, ReceiptLayoutSettings, ReceiptType } from './types';
 
-// Temporary tunnel endpoint (replace whenever ngrok URL changes)
-const API_BASE = 'https://hemicyclic-stirlessly-lexi.ngrok-free.dev/api';
-
 const DB_KEYS = {
-  SESSION: 'jewel_admin_session'
+  SESSION: 'jewel_admin_session',
+  API_BASE_OVERRIDE: 'jewel_admin_api_base_override'
 };
+
+const normalizeApiBase = (raw: string) => {
+  const value = (raw || '').trim().replace(/\/+$/, '');
+  if (!value) return '';
+  return value.endsWith('/api') ? value : `${value}/api`;
+};
+
+const resolveApiBase = () => {
+  if (typeof window === 'undefined') {
+    return normalizeApiBase(String(import.meta.env.VITE_API_BASE_URL || '')) || '/api';
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get('apiBase');
+  if (fromQuery) {
+    if (fromQuery.toLowerCase() === 'clear') {
+      localStorage.removeItem(DB_KEYS.API_BASE_OVERRIDE);
+      return normalizeApiBase(String(import.meta.env.VITE_API_BASE_URL || '')) || '/api';
+    }
+    const normalized = normalizeApiBase(fromQuery);
+    if (normalized) {
+      localStorage.setItem(DB_KEYS.API_BASE_OVERRIDE, normalized);
+      return normalized;
+    }
+  }
+
+  const fromStorage = normalizeApiBase(localStorage.getItem(DB_KEYS.API_BASE_OVERRIDE) || '');
+  if (fromStorage) return fromStorage;
+
+  const fromEnv = normalizeApiBase(String(import.meta.env.VITE_API_BASE_URL || ''));
+  if (fromEnv) return fromEnv;
+
+  return '/api';
+};
+
+let API_BASE = resolveApiBase();
 
 const DEFAULT_RECEIPT_LAYOUT: ReceiptLayoutSettings = {
   businessName: 'Rodriguez Jewelry',
@@ -86,6 +120,35 @@ const normalizeUser = (raw: any): User => ({
 });
 
 export const db = {
+  getApiBase: (): string => API_BASE,
+
+  getApiBaseOverride: (): string | null => {
+    if (typeof window === 'undefined') return null;
+    const value = normalizeApiBase(localStorage.getItem(DB_KEYS.API_BASE_OVERRIDE) || '');
+    return value || null;
+  },
+
+  setApiBaseOverride: (raw: string): string => {
+    const normalized = normalizeApiBase(raw);
+    if (!normalized) {
+      throw new Error('Please enter a valid API URL');
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(DB_KEYS.API_BASE_OVERRIDE, normalized);
+    }
+    API_BASE = normalized;
+    return API_BASE;
+  },
+
+  clearApiBaseOverride: (): string => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(DB_KEYS.API_BASE_OVERRIDE);
+    }
+    const fromEnv = normalizeApiBase(String(import.meta.env.VITE_API_BASE_URL || ''));
+    API_BASE = fromEnv || '/api';
+    return API_BASE;
+  },
+
   init: async () => {
     console.log('Database client initialized - Rodriguez Rizal Branch active');
   },

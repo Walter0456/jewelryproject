@@ -83,6 +83,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onSettingsUpdate, initialSe
   };
 
   const [isSaved, setIsSaved] = useState(false);
+  const [apiBaseInput, setApiBaseInput] = useState('');
+  const [apiBaseMessage, setApiBaseMessage] = useState<string | null>(null);
+  const [apiBaseError, setApiBaseError] = useState<string | null>(null);
+  const [activeApiBase, setActiveApiBase] = useState(() => db.getApiBase());
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
@@ -110,6 +114,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onSettingsUpdate, initialSe
   const [branchPinModal, setBranchPinModal] = useState(false);
   const [deletePinModal, setDeletePinModal] = useState(false);
   const testReceiptPreviewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const initialApiBase = db.getApiBaseOverride() || db.getApiBase();
+    setApiBaseInput(initialApiBase);
+    setActiveApiBase(db.getApiBase());
+  }, []);
 
   const handleProfilePictureUpload = (e: React.ChangeEvent<HTMLInputElement>, isSelf: boolean) => {
     const file = e.target.files?.[0];
@@ -322,6 +332,28 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onSettingsUpdate, initialSe
     } finally {
       setPurgeBusy(false);
     }
+  };
+
+  const handleApplyApiBase = () => {
+    setApiBaseMessage(null);
+    setApiBaseError(null);
+    try {
+      const updated = db.setApiBaseOverride(apiBaseInput);
+      setApiBaseInput(updated);
+      setActiveApiBase(updated);
+      setApiBaseMessage('API endpoint saved. New requests now use this URL.');
+    } catch (err: any) {
+      setApiBaseError(err?.message || 'Failed to save API endpoint');
+    }
+  };
+
+  const handleResetApiBase = () => {
+    setApiBaseMessage(null);
+    setApiBaseError(null);
+    const fallback = db.clearApiBaseOverride();
+    setApiBaseInput(fallback);
+    setActiveApiBase(fallback);
+    setApiBaseMessage('API endpoint reset to default.');
   };
 
   const previewReceiptType = settings.receiptLayout?.defaultReceiptType || 'OR';
@@ -1200,6 +1232,46 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onSettingsUpdate, initialSe
                       <p>{previewThankYouNote}</p>
                     </div>
                   </div>
+                </div>
+              </div>
+              <div className="md:col-span-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">API Endpoint</h4>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                    Paste your current ngrok URL. /api is auto-appended if missing.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Backend URL</label>
+                  <input
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-600"
+                    value={apiBaseInput}
+                    onChange={e => setApiBaseInput(e.target.value)}
+                    placeholder="https://your-ngrok-url.ngrok-free.app"
+                  />
+                </div>
+                <p className="text-[8px] font-bold uppercase tracking-widest text-slate-400">
+                  Active endpoint: <span className="text-slate-700">{activeApiBase}</span>
+                </p>
+                {apiBaseMessage && (
+                  <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">{apiBaseMessage}</p>
+                )}
+                {apiBaseError && (
+                  <p className="text-[9px] font-black uppercase tracking-widest text-rose-600">{apiBaseError}</p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleApplyApiBase}
+                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all"
+                  >
+                    Save Endpoint
+                  </button>
+                  <button
+                    onClick={handleResetApiBase}
+                    className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-700 hover:border-slate-400 transition-all"
+                  >
+                    Reset Default
+                  </button>
                 </div>
               </div>
             </div>
