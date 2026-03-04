@@ -17,7 +17,8 @@ const EmployeeRegistry = () => {
 
   const loadLogs = async () => {
     try {
-      const response = await fetch('/api/codes/logs', {
+      const response = await fetch(`${db.getApiBase()}/codes/logs`, {
+        credentials: 'include',
         headers: db.getAuthHeaders()
       });
       
@@ -62,8 +63,9 @@ const EmployeeRegistry = () => {
     setIsGenerating(true);
     setError(null);
     try {
-      const response = await fetch('/api/codes/generate', {
+      const response = await fetch(`${db.getApiBase()}/codes/generate`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...db.getAuthHeaders() },
         body: JSON.stringify({ adminUser: currentUser.username })
       });

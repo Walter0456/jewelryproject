@@ -12,6 +12,21 @@ const normalizeApiBase = (raw: string) => {
   return value.endsWith('/api') ? value : `${value}/api`;
 };
 
+const isLocalRuntime = () => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+};
+
+let lastOfflineAlertAt = 0;
+const notifyOffline = () => {
+  if (isLocalRuntime()) return;
+  const now = Date.now();
+  if (now - lastOfflineAlertAt < 8000) return;
+  lastOfflineAlertAt = now;
+  alert("SYSTEM OFFLINE: Please turn on the backend and database on Walter's laptop.");
+};
+
 const resolveApiBase = () => {
   if (typeof window === 'undefined') {
     return normalizeApiBase(String(import.meta.env.VITE_API_BASE_URL || '')) || '/api';
@@ -29,6 +44,11 @@ const resolveApiBase = () => {
       localStorage.setItem(DB_KEYS.API_BASE_OVERRIDE, normalized);
       return normalized;
     }
+  }
+
+  // Local development should always use Vite proxy for smooth localhost workflow.
+  if (isLocalRuntime()) {
+    return '/api';
   }
 
   const fromStorage = normalizeApiBase(localStorage.getItem(DB_KEYS.API_BASE_OVERRIDE) || '');
@@ -92,7 +112,7 @@ const fetchJson = async (url: string, options?: RequestInit) => {
         clearSession();
       }
       if (response.status === 502 || response.status === 503 || response.status === 504) {
-        alert("SYSTEM OFFLINE: Please turn on the backend and database on Walter's laptop.");
+        notifyOffline();
       }
       throw new Error(data.message || `API Error: ${response.status}`);
     }
@@ -103,7 +123,7 @@ const fetchJson = async (url: string, options?: RequestInit) => {
       String(err?.message || '').includes('Failed to fetch') ||
       String(err?.message || '').includes('NetworkError')
     ) {
-      alert("SYSTEM OFFLINE: Please turn on the backend and database on Walter's laptop.");
+      notifyOffline();
     }
     console.error(`Network or API Error at ${url}:`, err);
     throw err;

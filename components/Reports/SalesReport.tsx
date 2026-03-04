@@ -589,8 +589,9 @@ const SalesReport: React.FC<SalesReportProps> = ({ sales }) => {
                         onClick={async () => {
                           setIsExchanging(true);
                           try {
-                            const response = await fetch(`/api/sales/${exchangeSale.id}/exchange`, {
+                            const response = await fetch(`${db.getApiBase()}/sales/${exchangeSale.id}/exchange`, {
                               method: 'POST',
+                              credentials: 'include',
                               headers: { 'Content-Type': 'application/json', ...db.getAuthHeaders() },
                               body: JSON.stringify({
                                 returnItemId: returningItem.id,

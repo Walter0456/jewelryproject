@@ -1,7 +1,6 @@
 
 import express from 'express';
 import pkg from 'pg';
-import cors from 'cors';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
@@ -44,10 +43,33 @@ const PG_DUMP_PATH = process.env.PG_DUMP_PATH || 'pg_dump';
 const DEFAULT_BACKUP_DIR = process.env.BACKUP_DIR || path.join(process.cwd(), 'backups');
 const BACKUP_TASK_NAME = process.env.BACKUP_TASK_NAME || 'JewelAdmin Backup';
 const CROSS_SITE_COOKIES = String(process.env.CROSS_SITE_COOKIES || '').toLowerCase() === 'true';
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const DEFAULT_CORS_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const CORS_ORIGINS = [
+  ...new Set(
+    [
+      ...DEFAULT_CORS_ORIGINS,
+      ...(process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ].map((origin) => origin.replace(/\/+$/, ''))
+  ),
+];
+
+const isAllowedCorsOrigin = (origin) => {
+  if (!origin || typeof origin !== 'string') return true;
+  const normalized = origin.trim().replace(/\/+$/, '');
+  if (CORS_ORIGINS.includes(normalized)) return true;
+  try {
+    const url = new URL(normalized);
+    const isLocalHost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
+    if (isLocalHost && (url.protocol === 'http:' || url.protocol === 'https:')) return true;
+  } catch {
+    return false;
+  }
+  return false;
+};
 
 if (!JWT_SECRET) {
   console.error('FATAL: JWT_SECRET must be set in your environment.');
@@ -234,17 +256,42 @@ app.use(
   })
 );
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || CORS_ORIGINS.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-  })
-);
+app.use((req, res, next) => {
+  const reqOrigin = req.headers.origin;
+
+  if (!IS_PRODUCTION) {
+    if (typeof reqOrigin === 'string' && reqOrigin.length > 0) {
+      res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+      res.setHeader('Vary', 'Origin');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    return next();
+  }
+
+  if (typeof reqOrigin === 'string' && reqOrigin.length > 0) {
+    if (!isAllowedCorsOrigin(reqOrigin)) {
+      console.warn(`[CORS] Blocked origin: ${reqOrigin}`);
+      return res.status(403).json({ message: 'CORS origin blocked' });
+    }
+    res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+    res.setHeader('Vary', 'Origin');
+  }
+
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  return next();
+});
 
 app.use(cookieParser());
 app.use(bodyParser.json({ limit: '2mb' }));
@@ -257,8 +304,6 @@ const globalLimiter = rateLimit({
   message: { message: 'Too many requests. Please try again later.' },
 });
 app.use('/api', globalLimiter);
-
-app.use('/uploads', authenticate, express.static(uploadDir));
 
 // Centralized Error Helper
 const handleError = (res, err, status = 500) => {
@@ -436,6 +481,8 @@ const requireSelfOrAdmin = (req, res, next) => {
   }
   return res.status(403).json({ message: 'Forbidden' });
 };
+
+app.use('/uploads', authenticate, express.static(uploadDir));
 
 const execFileAsync = (cmd, args) => {
   return new Promise((resolve, reject) => {

@@ -17,11 +17,11 @@ if errorlevel 1 (
 
 :: 2. Start Backend (in a dedicated window)
 echo Starting Backend...
-start "%BACKEND_WINDOW%" /high cmd /c "cd /d \"%APP_ROOT%\" && npm run backend"
+start "%BACKEND_WINDOW%" /high cmd /c "cd /d ""%APP_ROOT%"" && npm.cmd run backend"
 
 :: 3. Start Frontend (in a dedicated window)
 echo Starting Frontend...
-start "%FRONTEND_WINDOW%" /high cmd /c "cd /d \"%APP_ROOT%\" && npm run start"
+start "%FRONTEND_WINDOW%" /high cmd /c "cd /d ""%APP_ROOT%"" && npm.cmd run start"
 
 :: 4. Wait a few seconds then open the browser
 timeout /t 5 >nul
