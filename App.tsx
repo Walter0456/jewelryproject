@@ -5,6 +5,7 @@ import {
   User as UserIcon, Menu, X, Store, Users as UsersIcon, ChevronDown, ChevronRight,
   CheckCircle, AlertCircle, Info
 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import { NavItem, Product, Activity, User, Sale, SystemSettings } from './types';
 import DashboardView from './components/DashboardView';
 import InventoryView from './components/InventoryView';
@@ -481,6 +482,7 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+      <Analytics />
     </div>
   );
 };
